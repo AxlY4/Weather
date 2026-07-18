@@ -16,7 +16,7 @@
             <button id="search-btn">Get Weather</button>
         </div>
 
-        <div id="error-message" style="color: red; margin-top: 10px;"></div>
+        <div id="error-message" style="color: red; margin-top: 10px; font-weight: bold;"></div>
 
         <!-- Current Conditions Display -->
         <div id="current-weather" class="weather-card" style="display: none;">
@@ -54,11 +54,11 @@
                 return;
             }
 
-            // Using relative URL pathing so it works seamlessly on GitHub/Render
-             fetch(`https://weather-561x.onrender.com/api/weather?city=${encodeURIComponent(city)}`)
+            // Explicitly pointing to your live active Render instance
+            fetch(`https://weather-561x.onrender.com/api/weather?city=${encodeURIComponent(city)}`)
                 .then(response => {
                     if (!response.ok) {
-                        return response.json().then(err => { throw new Error(err.error) });
+                        return response.json().then(err => { throw new Error(err.error || "Server error") });
                     }
                     return response.json();
                 })
@@ -85,7 +85,7 @@
                     });
                 })
                 .catch(error => {
-                    errorDiv.innerText = error.message;
+                    errorDiv.innerText = `❌ ${error.message}`;
                     document.getElementById('current-weather').style.display = 'none';
                     document.getElementById('forecast-section').style.display = 'none';
                 });
