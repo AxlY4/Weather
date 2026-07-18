@@ -55,7 +55,7 @@
             }
 
             // Using relative URL pathing so it works seamlessly on GitHub/Render
-            fetch(`/api/weather?city=${encodeURIComponent(city)}`)
+            fetch(`https://weather-561x.onrender.com/api/weather?city=${encodeURIComponent(city)}`)
                 .then(response => {
                     if (!response.ok) {
                         return response.json().then(err => { throw new Error(err.error) });
