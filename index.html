@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weather Analyzer</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div class="weather-container">
+        <h1>🌤️ Real-Time Weather Analyzer</h1>
+        
+        <div class="search-box">
+            <input type="text" id="city-input" placeholder="Enter city name...">
+            <button id="search-btn">Get Weather</button>
+        </div>
+
+        <div id="error-message" style="color: red; margin-top: 10px;"></div>
+
+        <!-- Current Conditions Display -->
+        <div id="current-weather" class="weather-card" style="display: none;">
+            <h2 id="target-location"></h2>
+            <p id="time-stamp"></p>
+            <p>🌡️ Temperature: <span id="current-temp"></span> °C</p>
+            <p>💨 Wind Speed: <span id="current-wind"></span> km/h</p>
+        </div>
+
+        <!-- 3-Hour Forecast Table Display -->
+        <div id="forecast-section" style="display: none; margin-top: 20px;">
+            <h3>📊 Short-Term Trend Analysis</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th>Temp (°C)</th>
+                        <th>Humidity (%)</th>
+                        <th>Wind (km/h)</th>
+                    </tr>
+                </thead>
+                <tbody id="forecast-body"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('search-btn').addEventListener('click', () => {
+            const city = document.getElementById('city-input').value.trim();
+            const errorDiv = document.getElementById('error-message');
+            errorDiv.innerText = ""; 
+
+            if (!city) {
+                errorDiv.innerText = "❌ City name cannot be empty.";
+                return;
+            }
+
+            // Using relative URL pathing so it works seamlessly on GitHub/Render
+            fetch(`/api/weather?city=${encodeURIComponent(city)}`)
+                .then(response => {
+                    if (!response.ok) {
+                        return response.json().then(err => { throw new Error(err.error) });
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    document.getElementById('current-weather').style.display = 'block';
+                    document.getElementById('forecast-section').style.display = 'block';
+
+                    document.getElementById('target-location').innerText = `🛰️ Target Found: ${data.location}`;
+                    document.getElementById('time-stamp').innerText = `As of: ${data.current.time}`;
+                    document.getElementById('current-temp').innerText = data.current.temp;
+                    document.getElementById('current-wind').innerText = data.current.wind;
+
+                    const tbody = document.getElementById('forecast-body');
+                    tbody.innerHTML = ""; 
+
+                    data.forecast.forEach(item => {
+                        const row = `<tr>
+                            <td>${item.time}</td>
+                            <td>${item.temp}</td>
+                            <td>${item.humidity}</td>
+                            <td>${item.wind}</td>
+                        </tr>`;
+                        tbody.innerHTML += row;
+                    });
+                })
+                .catch(error => {
+                    errorDiv.innerText = error.message;
+                    document.getElementById('current-weather').style.display = 'none';
+                    document.getElementById('forecast-section').style.display = 'none';
+                });
+        });
+    </script>
+</body>
+</html>
