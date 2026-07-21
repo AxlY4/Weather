@@ -1,5 +1,6 @@
-
 body {
+    box-sizing: border-box;
+    padding: 15px;
     display: flex;
     justify-content: center;
     align-items: center;
@@ -9,6 +10,21 @@ body {
     background-position: center;
     transition: all 0.5s ease;
     background-color: #071f36;
+}
+
+.card {
+    box-sizing: border-box;
+    width: 90%;
+    max-width: 380px;
+    padding: 20px 15px;
+
+    background-color: rgba(4, 78, 78, 0.4);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+
+    border: 5px solid antiquewhite;
+    border-radius: 20px;
+    overflow: hidden;
 }
 
 body.rainy {
@@ -27,18 +43,6 @@ body.foggy {
     background-image: url('assets/fog.jpg');
 }
 
-.card {
-    max-width: 380px;
-    padding: 20px 15px;
-
-    background-color: rgba(4, 78, 78, 0.4);
-    backdrop-filter: blur(10px);              
-    -webkit-backdrop-filter: blur(10px);    
-
-    border: 5px solid antiquewhite;
-    border-radius: 20px;
-    overflow: hidden;
-}
 
 
 .welcome, .tag {
