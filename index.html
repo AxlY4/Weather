@@ -3,93 +3,61 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Weather Analyzer</title>
+    <title>Weather</title>
+
     <link rel="stylesheet" href="style.css">
+
+    <link rel="icon" type="image/jpeg" href="assets/favicon.svg">
 </head>
 <body>
+  <div class="card">
+    <h2 class="welcome">Weather tracker</h2>
+    <p class="tag">Find any weather forecast from anywhere just by using Weather tracker</p>
+    
+    <form id="weatherForm" class="search-box">
+        <input type="text" id="countryInput" name="country" placeholder="Write the country name">
+        <button type="submit">Submit</button>
+    </form>
+    
+    <div id="resultBox" style="text-align: center; color: antiquewhite; margin-top: 15px;"></div>
+  </div>
 
-    <div class="weather-container">
-        <h1>🌤️ Real-Time Weather Analyzer</h1>
-        
-        <div class="search-box">
-            <input type="text" id="city-input" placeholder="Enter city name...">
-            <button id="search-btn">Get Weather</button>
-        </div>
+<script>
+document.getElementById('weatherForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
 
-        <div id="error-message" style="color: red; margin-top: 10px; font-weight: bold;"></div>
+    const country = document.getElementById('countryInput').value;
+    const resultBox = document.getElementById('resultBox');
 
-        <!-- Current Conditions Display -->
-        <div id="current-weather" class="weather-card" style="display: none;">
-            <h2 id="target-location"></h2>
-            <p id="time-stamp"></p>
-            <p>🌡️ Temperature: <span id="current-temp"></span> °C</p>
-            <p>💨 Wind Speed: <span id="current-wind"></span> km/h</p>
-        </div>
+    if (!country) return;
+    resultBox.innerHTML = "Fetching weather...";
 
-        <!-- 3-Hour Forecast Table Display -->
-        <div id="forecast-section" style="display: none; margin-top: 20px;">
-            <h3>📊 Short-Term Trend Analysis</h3>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Time</th>
-                        <th>Temp (°C)</th>
-                        <th>Humidity (%)</th>
-                        <th>Wind (km/h)</th>
-                    </tr>
-                </thead>
-                <tbody id="forecast-body"></tbody>
-            </table>
-        </div>
-    </div>
+    try {
+        // 1. Fetch from the updated /get-weather-data route using 'country' parameter
+        const response = await fetch(`http://127.0.0.1:5000/get-weather-data?country=${encodeURIComponent(country)}`);
+        const data = await response.json();
 
-    <script>
-        document.getElementById('search-btn').addEventListener('click', () => {
-            const city = document.getElementById('city-input').value.trim();
-            const errorDiv = document.getElementById('error-message');
-            errorDiv.innerText = ""; 
+        if (data.error) {
+            resultBox.innerHTML = `<p style="color: #ff6b6b;">${data.error}</p>`;
+            return;
+        }
 
-            if (!city) {
-                errorDiv.innerText = "❌ City name cannot be empty.";
-                return;
-            }
+        // 2. Change background image using data.current.condition
+        document.body.className = data.current.condition;
 
-            // Explicitly pointing to your live active Render instance
-            fetch(`https://weather-561x.onrender.com/api/weather?city=${encodeURIComponent(city)}`)
-                .then(response => {
-                    if (!response.ok) {
-                        return response.json().then(err => { throw new Error(err.error || "Server error") });
-                    }
-                    return response.json();
-                })
-                .then(data => {
-                    document.getElementById('current-weather').style.display = 'block';
-                    document.getElementById('forecast-section').style.display = 'block';
-
-                    document.getElementById('target-location').innerText = `🛰️ Target Found: ${data.location}`;
-                    document.getElementById('time-stamp').innerText = `As of: ${data.current.time}`;
-                    document.getElementById('current-temp').innerText = data.current.temp;
-                    document.getElementById('current-wind').innerText = data.current.wind;
-
-                    const tbody = document.getElementById('forecast-body');
-                    tbody.innerHTML = ""; 
-
-                    data.forecast.forEach(item => {
-                        const row = `<tr>
-                            <td>${item.time}</td>
-                            <td>${item.temp}</td>
-                            <td>${item.humidity}</td>
-                            <td>${item.wind}</td>
-                        </tr>`;
-                        tbody.innerHTML += row;
-                    });
-                })
-                .catch(error => {
-                    errorDiv.innerText = `❌ ${error.message}`;
-                    document.getElementById('current-weather').style.display = 'none';
-                    document.getElementById('forecast-section').style.display = 'none';
-                });
-        });
-    </script>
+        // 3. Display Location, Date, Time, and Temp using data.current
+        resultBox.innerHTML = `
+            <p style="margin: 5px 0 0 0; font-weight: bold; font-size: 1.1rem;">${data.location}</p>
+            <p style="margin: 2px 0 10px 0; font-size: 0.85rem; opacity: 0.8;">${data.current.date} | ${data.current.time}</p>
+            <h2 style="margin: 5px 0;">${data.current.temp}°C</h2>
+            <p style="margin: 0; text-transform: capitalize; opacity: 0.9;">${data.current.condition}</p>
+            <p style="margin-top: 5px; font-size: 0.85rem; opacity: 0.8;">Wind: ${data.current.wind} km/h</p>
+        `;
+    } catch (err) {
+        resultBox.innerHTML = "Could not fetch weather.";
+    }
+});
+</script>
+  
 </body>
 </html>
