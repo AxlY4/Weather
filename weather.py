@@ -28,7 +28,7 @@ def home():
     return render_template('index.html')
 
 def get_coordinates(city_name):
-    # Open-Meteo Geocoding API (Fast and reliable)
+    # Free Geocoding endpoint
     url = f"https://geocoding-api.open-meteo.com/v1/search?name={city_name}&count=1&language=en&format=json"
     try:
         response = requests.get(url, timeout=5)
@@ -47,14 +47,16 @@ def get_coordinates(city_name):
         return None
 
 def get_weather(lat, lon):
-    url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current_weather=true&hourly=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code,weathercode&timezone=auto"
+    # Standard, clean Open-Meteo URL format
+    url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current_weather=true&hourly=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code&timezone=auto"
     try:
         response = requests.get(url, timeout=5)
         if response.status_code == 200:
             return response.json()
+        print(f"Open-Meteo Error Status: {response.status_code}, Body: {response.text}")
         return None
     except Exception as e:
-        print(f"Weather error: {e}")
+        print(f"Weather network error: {e}")
         return None
 
 @app.route('/get-weather-data', methods=['GET'])
@@ -75,11 +77,11 @@ def weather_endpoint():
         current = data.get("current_weather", {})
         hourly = data.get("hourly", {})
 
-        # Extract current weather safely
+        # Extract current weather code
         current_code = current.get("weathercode", current.get("weather_code", 0))
         current_condition = map_weather_condition(current_code)
 
-        # Parse current date and time safely
+        # Parse current date & time
         raw_current_time = current.get("time", "")
         if raw_current_time:
             try:
@@ -93,12 +95,12 @@ def weather_endpoint():
             formatted_date = "Today"
             formatted_time = "Now"
 
-        # Parse hourly forecast data safely
+        # Parse hourly forecast data
         forecast = []
         hourly_times = hourly.get("time", [])
         hourly_temps = hourly.get("temperature_2m", [])
         hourly_humidity = hourly.get("relative_humidity_2m", [])
-        hourly_wind = hourly.get("wind_speed_10m", hourly.get("windspeed_10m", []))
+        hourly_wind = hourly.get("wind_speed_10m", [])
         hourly_codes = hourly.get("weather_code", hourly.get("weathercode", []))
 
         for i in range(3, 13, 3):
@@ -141,8 +143,7 @@ def weather_endpoint():
         })
 
     except Exception as err:
-        # Prevents quiet 500 crashes and prints full error
-        print(f"Server Error: {err}")
+        print(f"Unhandled Server Exception: {err}")
         return jsonify({"error": f"Internal Error: {str(err)}"}), 500
 
 if __name__ == '__main__':
