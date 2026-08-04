@@ -2,142 +2,92 @@ from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
 import requests
 from datetime import datetime
-
-def map_weather_condition(code):
-    try:
-        code = int(code)
-    except (ValueError, TypeError):
-        code = 0
-        
-    if code in [0, 1, 2, 3]:
-        return "sunny"
-    elif code in [45, 48]:
-        return "foggy"
-    elif code in [95, 96, 99]:
-        return "thunderstorm"
-    elif code in [51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82]:
-        return "rainy"
-    else:
-        return "sunny"
+import os
 
 app = Flask(__name__)
 CORS(app)
+
+# Your WeatherAPI Key
+WEATHER_API_KEY = "3083d196a0fd46beaa1195309260408"
+
+def map_weather_condition(text):
+    text = str(text).lower()
+    if any(w in text for w in ["rain", "drizzle", "shower"]):
+        return "rainy"
+    elif any(w in text for w in ["thunder", "storm"]):
+        return "thunderstorm"
+    elif any(w in text for w in ["fog", "mist", "haze", "overcast", "cloud"]):
+        return "foggy"
+    else:
+        return "sunny"
 
 @app.route('/')
 def home():
     return render_template('index.html')
 
-def get_coordinates(city_name):
-    # Free Geocoding endpoint
-    url = f"https://geocoding-api.open-meteo.com/v1/search?name={city_name}&count=1&language=en&format=json"
-    try:
-        response = requests.get(url, timeout=5)
-        if response.status_code == 200:
-            data = response.json()
-            if "results" in data and len(data["results"]) > 0:
-                result = data["results"][0]
-                return {
-                    "lat": float(result["latitude"]),
-                    "lon": float(result["longitude"]),
-                    "name": result.get("name", city_name)
-                }
-        return None
-    except Exception as e:
-        print(f"Geocoding error: {e}")
-        return None
-
-def get_weather(lat, lon):
-    # Standard, clean Open-Meteo URL format
-    url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current_weather=true&hourly=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code&timezone=auto"
-    try:
-        response = requests.get(url, timeout=5)
-        if response.status_code == 200:
-            return response.json()
-        print(f"Open-Meteo Error Status: {response.status_code}, Body: {response.text}")
-        return None
-    except Exception as e:
-        print(f"Weather network error: {e}")
-        return None
-
 @app.route('/get-weather-data', methods=['GET'])
 def weather_endpoint():
     try:
-        city = request.args.get('country', '').strip()
+        city = request.args.get('country', '').strip() or request.args.get('city', '').strip()
         if not city:
             return jsonify({"error": "Location cannot be empty"}), 400
 
-        loc = get_coordinates(city)
-        if loc is None:
+        # WeatherAPI handles location search + current weather + forecast in 1 request
+        url = f"http://api.weatherapi.com/v1/forecast.json?key={WEATHER_API_KEY}&q={city}&days=2&aqi=no&alerts=no"
+        
+        response = requests.get(url, timeout=5)
+        if response.status_code != 200:
             return jsonify({"error": f"Could not find location '{city}'"}), 404
 
-        data = get_weather(loc['lat'], loc['lon'])
-        if data is None:
-            return jsonify({"error": "Failed to fetch weather data from API"}), 500
+        data = response.json()
+        location_info = data['location']
+        current_data = data['current']
 
-        current = data.get("current_weather", {})
-        hourly = data.get("hourly", {})
-
-        # Extract current weather code
-        current_code = current.get("weathercode", current.get("weather_code", 0))
-        current_condition = map_weather_condition(current_code)
-
-        # Parse current date & time
-        raw_current_time = current.get("time", "")
-        if raw_current_time:
-            try:
-                current_dt = datetime.fromisoformat(raw_current_time.replace('Z', ''))
-                formatted_date = current_dt.strftime('%A, %B %d, %Y')
-                formatted_time = current_dt.strftime('%I:%M %p')
-            except Exception:
-                formatted_date = "Today"
-                formatted_time = "Now"
-        else:
+        # Format current date & time
+        try:
+            current_dt = datetime.strptime(location_info['localtime'], '%Y-%m-%d %H:%M')
+            formatted_date = current_dt.strftime('%A, %B %d, %Y')
+            formatted_time = current_dt.strftime('%I:%M %p')
+        except Exception:
             formatted_date = "Today"
             formatted_time = "Now"
 
-        # Parse hourly forecast data
+        # Build hourly forecast (sampling every 3 hours)
         forecast = []
-        hourly_times = hourly.get("time", [])
-        hourly_temps = hourly.get("temperature_2m", [])
-        hourly_humidity = hourly.get("relative_humidity_2m", [])
-        hourly_wind = hourly.get("wind_speed_10m", [])
-        hourly_codes = hourly.get("weather_code", hourly.get("weathercode", []))
+        hours = []
+        for day in data.get('forecast', {}).get('forecastday', []):
+            hours.extend(day.get('hour', []))
 
-        for i in range(3, 13, 3):
-            if i < len(hourly_times):
-                t_str = hourly_times[i]
-                try:
-                    dt = datetime.fromisoformat(t_str.replace('Z', ''))
-                    f_date = dt.strftime('%Y-%m-%d')
-                    f_time = dt.strftime('%I:%M %p')
-                except Exception:
-                    f_date = t_str
-                    f_time = ""
+        # Grab hours in step intervals of 3 starting from hour index 3
+        for i in range(3, min(len(hours), 24), 3):
+            h = hours[i]
+            try:
+                dt = datetime.strptime(h['time'], '%Y-%m-%d %H:%M')
+                f_date = dt.strftime('%Y-%m-%d')
+                f_time = dt.strftime('%I:%M %p')
+            except Exception:
+                f_date = h.get('time', '')
+                f_time = ""
 
-                temp_val = hourly_temps[i] if i < len(hourly_temps) else "N/A"
-                hum_val = hourly_humidity[i] if i < len(hourly_humidity) else "N/A"
-                wind_val = hourly_wind[i] if i < len(hourly_wind) else "N/A"
-                code_val = hourly_codes[i] if i < len(hourly_codes) else 0
-
-                forecast.append({
-                    "date": f_date,
-                    "time": f_time,
-                    "temp": temp_val,
-                    "humidity": hum_val,
-                    "wind": wind_val,
-                    "condition": map_weather_condition(code_val)
-                })
+            forecast.append({
+                "date": f_date,
+                "time": f_time,
+                "temp": h.get('temp_c', "N/A"),
+                "humidity": h.get('humidity', "N/A"),
+                "wind": h.get('wind_kph', "N/A"),
+                "condition": map_weather_condition(h.get('condition', {}).get('text', ''))
+            })
 
         return jsonify({
-            "location": loc['name'],
-            "lat": loc['lat'],
-            "lon": loc['lon'],
+            "location": f"{location_info['name']}, {location_info['country']}",
+            "lat": location_info['lat'],
+            "lon": location_info['lon'],
             "current": {
                 "date": formatted_date,
                 "time": formatted_time,
-                "temp": current.get("temperature", "N/A"),
-                "wind": current.get("windspeed", "N/A"),
-                "condition": current_condition
+                "temp": current_data.get("temp_c", "N/A"),
+                "wind": current_data.get("wind_kph", "N/A"),
+                "condition": map_weather_condition(current_data.get("condition", {}).get("text", ""))
             },
             "forecast": forecast
         })
@@ -147,4 +97,5 @@ def weather_endpoint():
         return jsonify({"error": f"Internal Error: {str(err)}"}), 500
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=True)
