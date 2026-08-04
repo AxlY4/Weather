@@ -42,7 +42,7 @@ def get_coordinates(city_name):
         return None
 
 def get_weather(lat, lon):
-    url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current_weather=true&weathercode=true&hourly=temperature_2m,relative_humidity_2m,wind_speed_10m,weathercode&timezone=auto"
+    url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current_weather=true&hourly=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code&timezone=auto"
     try:
         response = requests.get(url)
         if response.status_code == 200:
@@ -73,15 +73,17 @@ def weather_endpoint():
 
     # 2. Parse Current Date and Time
     current_datetime = datetime.fromisoformat(current["time"].replace('Z', ''))
-    formatted_date = current_datetime.strftime('%A, %B %d, %Y')  # e.g., "Tuesday, July 21, 2026"
-    formatted_time = current_datetime.strftime('%I:%M %p')       # e.g., "11:42 PM"
+    formatted_date = current_datetime.strftime('%A, %B %d, %Y')
+    formatted_time = current_datetime.strftime('%I:%M %p')
 
     # 3. Parse Forecast Data
     forecast = []
+    hourly_codes = hourly.get("weather_code", hourly.get("weathercode", []))
+
     for i in range(3, 13, 3):
         if i < len(hourly["time"]):
             raw_time = datetime.fromisoformat(hourly["time"][i].replace('Z', ''))
-            code = hourly["weathercode"][i] if "weathercode" in hourly else 0
+            code = hourly_codes[i] if i < len(hourly_codes) else 0
 
             forecast.append({
                 "date": raw_time.strftime('%Y-%m-%d'),
@@ -98,8 +100,8 @@ def weather_endpoint():
         "lat": loc['lat'],
         "lon": loc['lon'],
         "current": {
-            "date": formatted_date,       # <--- ADDED DATE
-            "time": formatted_time,       # <--- ADDED TIME
+            "date": formatted_date,
+            "time": formatted_time,
             "temp": current["temperature"],
             "wind": current["windspeed"],
             "condition": current_condition
